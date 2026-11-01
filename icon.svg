@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Token Monitor">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#111827"/>
+  <path d="M22 84c10 0 12-26 22-26s12 26 22 26 12-26 22-26 10 26 18 26"
+        fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="100" cy="44" r="9" fill="#f59e0b"/>
+  <circle cx="33" cy="44" r="6" fill="#34d399"/>
+</svg>

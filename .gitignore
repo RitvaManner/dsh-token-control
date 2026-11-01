@@ -1,0 +1,4 @@
+node_modules/
+.dsh-dev/
+*.log
+.DS_Store

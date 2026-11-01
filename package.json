@@ -1,0 +1,76 @@
+{
+  "name": "dsh-token-control",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Per-turn token and cost readout, DeepSeek CNY balance, and peak/off-peak countdown for DeepSeek Harness.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RitvaManner/dsh-token-control.git"
+  },
+  "homepage": "https://github.com/RitvaManner/dsh-token-control#readme",
+  "bugs": {
+    "url": "https://github.com/RitvaManner/dsh-token-control/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "token",
+    "cost",
+    "peak",
+    "balance",
+    "cny"
+  ],
+  "main": "src/host/index.js",
+  "exports": {
+    ".": "./src/host/index.js",
+    "./client": "./src/client/client.js",
+    "./locale/*": "./locale/*",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "test": "node --test tests/",
+    "check": "node scripts/build-client.mjs --check && node scripts/check.mjs",
+    "dev": "node scripts/build-client.mjs && node scripts/dev.mjs",
+    "dev:reset": "node scripts/build-client.mjs && node scripts/dev.mjs --reset",
+    "prepack": "node scripts/build-client.mjs --check && node scripts/check.mjs"
+  },
+  "dsh": {
+    "displayName": "Token Monitor",
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  }
+}

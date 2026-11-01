@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Token Monitor",
+    "description": "Live per-turn token and cost readout, DeepSeek CNY balance with staleness, and the current peak/off-peak window with a switch countdown."
+  }
+}

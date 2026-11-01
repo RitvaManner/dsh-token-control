@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "views": [
+    {
+      "id": "readout-bar",
+      "script": "readout-bar.js",
+      "label": "读数带"
+    }
+  ]
+}

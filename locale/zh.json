@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Token 监控",
+    "description": "实时显示每轮 token 与金额读数、DeepSeek 人民币余额（含过期标记）、当前峰谷时段与切换倒计时。"
+  }
+}

@@ -1,0 +1,94 @@
+name: Release
+
+# Tag `v0.1.0` → checks → npm publish.
+# Manual runs default to a dry run (every check, no upload).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run every check but do not publish'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Required by `npm publish --provenance` (supply-chain attestation).
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # No `cache:` here on purpose: this package has no runtime dependencies,
+      # so there is no lockfile to cache and nothing to install.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Resolve version and guard the tag
+        id: meta
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match package.json version $VERSION"
+              exit 1
+            fi
+          fi
+          echo "package: dsh-token-control@$VERSION"
+
+      # The Client bundle is a generated file; this fails when core.js or a View
+      # changed without re-running scripts/build-client.mjs.
+      - name: Verify the Client bundle is current
+        run: node scripts/build-client.mjs --check
+
+      - name: Static checks
+        run: node scripts/check.mjs
+
+      - name: Unit tests
+        run: node --test tests/
+
+      - name: Show the exact package contents
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: Publish dry run
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
+        run: npm publish --dry-run
+
+      - name: Summary
+        run: |
+          {
+            echo "### dsh-token-control v${{ steps.meta.outputs.version }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "- Trigger: tag \`$GITHUB_REF_NAME\`"
+              echo "- Published: yes (with provenance)"
+            elif [ "${{ inputs.dry_run }}" = "true" ]; then
+              echo "- Trigger: manual (dry run)"
+              echo "- Published: no"
+            else
+              echo "- Trigger: manual"
+              echo "- Published: yes (with provenance)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

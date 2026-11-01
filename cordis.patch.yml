@@ -1,0 +1,13 @@
+# Bundle patch for dsh-token-control.
+#
+# A top-level YAML array of loader patch entries. The single row mounts the
+# Host half (the row's `name` is a bare package name resolved through the
+# profile's node_modules). The browser half joins the Client module graph
+# automatically: package.json declares `dsh.client` (platform: web) and
+# exports "./client".
+- insert:
+    - id: dsh-token-control
+      name: dsh-token-control
+      config:
+        balanceRefreshSeconds: 60
+        balanceRefreshOnTurnEnd: true
