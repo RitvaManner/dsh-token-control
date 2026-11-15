@@ -87,6 +87,8 @@ dsh-token-control/                      # 仓库根 = 包根（单包，无 mono
    │  ├─ pricing-table.js               # TablePricingStrategy（结算时按调用时刻问 PeakPeriodProvider）
    │  ├─ peak-policy.js                 # PolicyPeakPeriodProvider
    │  ├─ balance-deepseek.js            # DeepSeekBalanceProvider（Host 侧解析 key，调 /user/balance）
+   │  ├─ balance-account.js             # AccountBalanceProvider（走 DSH 账户服务的钱包，无需 key）
+   │  ├─ balance-fallback.js            # FallbackBalanceProvider（有 key 用 key，仅 no-credential 时换源）
    │  ├─ balance-state.js               # 余额快照：成功/失败保留旧值 + 过期秒数
    │  ├─ calibrator.js                  # 余额差值校准（指数平滑比例）
    │  └─ alerts-null.js                 # NullAlertSink（接口保留，v1 不启用）
@@ -207,8 +209,9 @@ interface BalanceProvider {
 ```
 
 - 密钥解析、HTTP、错误码映射全在实现内部；**接口层面没有任何密钥字段**。
-- 第一版实现 `DeepSeekBalanceProvider`：`ctx.credentials.resolve('DEEPSEEK_API_KEY')` → `GET /user/balance` → 取 `currency==='CNY'` 的 `total_balance`。
-- 预留 `deepseek-account` 实现（平台钱包）留到后续 —— 接口不变。
+- `DeepSeekBalanceProvider`（API Key 那条）：`ctx.credentials.resolve('DEEPSEEK_API_KEY')` → `GET /user/balance` → 取 `currency==='CNY'` 的 `total_balance`。
+- `AccountBalanceProvider`（账户那条）：`ctx.get('deepseekAccount')` → `getBalance(client)` → 把充值钱包与赠金钱包的 CNY 余额相加；服务不存在时按 `no-credential` 失败，不伪造数字。平台授权由 DSH 自己保管，provider 只拿到金额。
+- `FallbackBalanceProvider` 把两条串起来：key 存在时 key 说话；只有它报 `no-credential` 才去问账户，其他失败原样抛出，所以**有 key 的 profile 行为逐位不变**。
 
 ### 4.4 View（Client 侧，可替换、可多个）
 
@@ -322,7 +325,10 @@ inject = ['sessions','webServer','credentials','timer']   // 缺省时用 ctx.ge
 apply(ctx, config):
   const peak      = createPolicyPeakPeriodProvider(POLICY_REGISTRY)
   const pricing   = createTablePricingStrategy(PRICE_TABLE, peak)      // 注入 peak 接口
-  const balance   = createDeepSeekBalanceProvider(ctx.credentials, config)
+  const balance   = createFallbackBalanceProvider({
+                      primary:  createDeepSeekBalanceProvider(ctx.credentials, config),
+                      fallback: createAccountBalanceProvider({ getAccount: () => ctx.get('deepseekAccount') }),
+                    })
   const alerts    = createNullAlertSink()
   const ledger    = createLedger({ ctx.sessions, now })
   const balanceSt = createBalanceState({ provider: balance, scheduler: ctx, config })

@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-control",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Per-turn token and cost readout, DeepSeek CNY balance, and peak/off-peak countdown for DeepSeek Harness.",
   "license": "MIT",

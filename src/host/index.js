@@ -7,6 +7,10 @@
  *
  * Every registration (events, timers, routes) goes through `ctx.effect`, so
  * unloading the plugin removes all of them.
+ *
+ * The balance seam is a fallback pair: the API-key provider answers whenever
+ * `DEEPSEEK_API_KEY` exists, and a profile signed in only through the DeepSeek
+ * account gets the same wallet from DSH's own account service.
  */
 
 import { fileURLToPath } from 'node:url';
@@ -15,8 +19,10 @@ import { createViewModelBuilder } from '../consumer/view-model-builder.js';
 import { createHub } from '../consumer/hub.js';
 import { createLedger } from '../consumer/ledger.js';
 import { createCalibrator } from '../provider/calibrator.js';
+import { createAccountBalanceProvider } from '../provider/balance-account.js';
 import { createBalanceState } from '../provider/balance-state.js';
 import { createDeepSeekBalanceProvider } from '../provider/balance-deepseek.js';
+import { createFallbackBalanceProvider } from '../provider/balance-fallback.js';
 import { createNullAlertSink } from '../provider/alerts-null.js';
 import { createPolicyPeakPeriodProvider } from '../provider/peak-policy.js';
 import { createTablePricingStrategy } from '../provider/pricing-table.js';
@@ -55,7 +61,18 @@ export function apply(ctx, rawConfig) {
     for (const sessionId of hub.sessionIds()) dirty.add(sessionId);
   };
 
-  const balanceProvider = createDeepSeekBalanceProvider({ credentials: ctx.credentials });
+  // A key, when present, is the source of record; the account service answers
+  // only the `no-credential` case, so an existing key never changes behaviour.
+  // `deepseekAccount` is optional and resolved per call: it may start after
+  // this plugin, and a profile without it simply has no second source.
+  const apiKeyBalanceProvider = createDeepSeekBalanceProvider({ credentials: ctx.credentials });
+  const accountBalanceProvider = createAccountBalanceProvider({
+    getAccount: () => ctx.get('deepseekAccount'),
+  });
+  const balanceProvider = createFallbackBalanceProvider({
+    primary: apiKeyBalanceProvider,
+    fallback: accountBalanceProvider,
+  });
   const balanceState = createBalanceState({
     provider: balanceProvider,
     onChanged: () => markAllDirty(),
