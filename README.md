@@ -10,18 +10,18 @@
 
 **Per-turn token and cost readout, DeepSeek CNY balance, and peak/off-peak countdown** — a DeepSeek Harness plugin mounted above the composer.
 
-[What it shows](#what-it-shows) · [Layout](#layout) · [Install](#install) · [Development](#development) · [Security](#security) · [Release notes](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/release-notes-v0.1.0.md)
+[What it shows](#what-it-shows) · [Layout](#layout) · [Install](#install) · [Development](#development) · [Security](#security) · [Release notes](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/release-notes-v0.2.0.md)
 
 Host and Client are strictly separated; PricingStrategy, BalanceProvider, PeakPeriodProvider, and View are replaceable seams; the UI is fully pluggable.
 
-> Status: v0.1.0 — rendered and exercised on a desktop profile (real session numbers, live balance), 47 unit assertions passing. Design: [docs/design-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/design-v1.md) · Verification: [docs/verify-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/verify-v1.md).
+> Status: v0.2.0 — rendered and exercised on a desktop profile (real session numbers, live balance with **and** without an API key), 57 unit assertions passing. Design: [docs/design-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/design-v1.md) · Verification: [docs/verify-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/verify-v1.md).
 
 ## What it shows
 
 - Per turn: total tokens, input total, output, cache hits, cache misses — separately.
 - Cost from the price table, with the peak/off-peak unit price chosen **at each call's own timestamp**, so a turn that crosses a boundary is still billed correctly.
 - Live streaming updates; before the provider reports usage the output count is a character estimate, clearly marked with `≈`, then replaced by the committed value.
-- Balance from `GET /user/balance` (CNY wallet). A failed refresh keeps the previous reading and marks it stale with its timestamp.
+- Balance from the CNY wallet, always read on the Host: `GET /user/balance` when `DEEPSEEK_API_KEY` exists, otherwise the same wallet through DSH's own account service — so a profile signed in with the DeepSeek account needs no key. A failed refresh keeps the previous reading and marks it stale with its timestamp; with neither a key nor a signed-in account it says "未配置" rather than making a number up.
 - Peak windows: Beijing time Mon–Fri 09:00–12:00 and 14:00–18:00, excluding statutory holidays; everything else (weekends, holidays, make-up workday weekends) is off-peak at 50%.
 - Reminder: countdown in the readout during the last five minutes, plus a silent three-second "switched" note — no dialog, no interruption.
 
@@ -29,7 +29,7 @@ Host and Client are strictly separated; PricingStrategy, BalanceProvider, PeakPe
 
 ```
 src/definition/   contracts and pure data: ViewModel, wire protocol, peak math, price table, holiday policy
-src/provider/     replaceable implementations (pricing, peak policy, DeepSeek balance, calibration, null alerts)
+src/provider/     replaceable implementations (pricing, peak policy, API-key and account balance, calibration, null alerts)
 src/consumer/     depends on definition only: ledger fold, ViewModel builder, hub, view config
 src/host/         composition root; every registration goes through ctx.effect
 src/client/       core.js (transport, store, ViewRegistry, React shell, settings page)
@@ -73,6 +73,7 @@ Everything lives inside the repository (`.dsh-dev/`); `~/.dsh` is untouched.
 ## Security
 
 - The API key is resolved **on the Host only** through `ctx.credentials.resolve('DEEPSEEK_API_KEY')` and appears solely in the outbound `Authorization` header.
+- The account path never touches a token: `AccountBalanceProvider` asks the Host for `ctx.get('deepseekAccount')` and receives the wallet amounts, not the platform grant DSH keeps in its credential store.
 - The browser receives a field-by-field ViewModel; a test pins the key set. No key, URL, upstream body, Session, or event reaches the page.
 - Errors cross the wire as enum codes.
 - The routes bind loopback only, but they are registered outside DSH's `/api` connection admission: a local process can read the snapshot (it carries the balance, never the key). This matches the existing community-plugin pattern; wrapping the handler in `ctx.connection.admit` is the hardening path.

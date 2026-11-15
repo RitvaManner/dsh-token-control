@@ -81,7 +81,7 @@
 ```sh
 node scripts/build-client.mjs        # 确认 bundle 最新
 node scripts/check.mjs               # 架构方向 / 协议镜像 / 乱码 / bundle 是否落后
-node --test tests/                   # 47 条断言（在有子进程权限的终端跑）
+node --test tests/                   # 57 条断言（在有子进程权限的终端跑）
 npm pack --dry-run                   # 看真实打包清单，确认没有多余/缺失文件
 ```
 
@@ -165,7 +165,7 @@ git push origin v0.1.0
 1. 校验 `tag` 与 `package.json` 的 `version` 一致（`v0.1.0` ↔ `0.1.0`）；
 2. `node scripts/build-client.mjs --check` —— `client.js` 落后于 `core.js`/View 就直接失败；
 3. `node scripts/check.mjs` —— 架构方向、协议镜像、乱码、bundle 同步；
-4. `node --test tests/` —— 47 条断言；
+4. `node --test tests/` —— 57 条断言；
 5. `npm pack --dry-run` —— 把真实打包清单打进日志；
 6. `npm publish --provenance --access public`。
 
@@ -215,7 +215,7 @@ README 顶部的徽章已就位（npm 版本 / 下载量 / 许可证 / node / ds
 ## 8. 已知需要在发布说明里写清楚的限制
 
 1. 流式期间输出 token 是字符估算（`≈`），结算后替换为真值。
-2. 余额需要 `DEEPSEEK_API_KEY`；没有就显示「未配置」，不伪造数字。
+2. 余额有两条来源：配了 `DEEPSEEK_API_KEY` 时走 `/user/balance`；没有 key 但用 `deepseek-account` 登录时走 DSH 账户服务的钱包合计。都没有就显示「未配置」，不伪造数字。
 3. 插件路由只绑定回环，但注册在 DSH `/api` 连接鉴权之外（同机进程可读快照，含余额，不含 key）。
 4. 读数带挂 `conversation.input.dock`；与内置 `ui-chat` 的 usage 行并存，不冲突。
 5. 当前只有一个 View（ReadoutBar）；新增 View 需要 `views/<id>.js` + `index.json` 一行 + `pnpm build`。

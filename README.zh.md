@@ -10,11 +10,11 @@
 
 **每轮 token 与金额读数 + DeepSeek 人民币余额 + 峰谷时段与切换提醒** —— DeepSeek Harness 插件，挂在输入框上方。
 
-[功能](#功能) · [架构](#架构) · [安装](#安装) · [开发](#开发隔离环境) · [配置](#配置) · [安全](#安全) · [发布说明](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/release-notes-v0.1.0.md)
+[功能](#功能) · [架构](#架构) · [安装](#安装) · [开发](#开发隔离环境) · [配置](#配置) · [安全](#安全) · [发布说明](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/release-notes-v0.2.0.md)
 
 Host / Client 强制分离；PricingStrategy、BalanceProvider、PeakPeriodProvider、View 都是可替换接口；UI 完全可插拔。
 
-> 状态：v0.1.0 —— 已在 desktop profile 实机渲染并验证（真实会话数字 + 实时余额），47 条断言通过。设计：[docs/design-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/design-v1.md) · 验证记录：[docs/verify-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/verify-v1.md)。
+> 状态：v0.2.0 —— 已在 desktop profile 实机验证（真实会话数字 + 实时余额，**有 API Key 和无 API Key 两条来源都实测**），57 条断言通过。设计：[docs/design-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/design-v1.md) · 验证记录：[docs/verify-v1.md](https://github.com/RitvaManner/dsh-token-control/blob/main/docs/verify-v1.md)。
 
 ---
 
@@ -23,7 +23,7 @@ Host / Client 强制分离；PricingStrategy、BalanceProvider、PeakPeriodProvi
 - **每轮读数**：总 token、输入合计、输出、缓存命中、缓存未命中，分开显示。
 - **金额**：价格表结算，按「每次调用发生的时刻」选峰/谷单价；一轮内跨时段也不会算错。
 - **流式更新**：流式分片到达即更新；在 provider 上报 usage 之前，用字符数估算并明确标注 `≈`，结算后替换为真值。
-- **余额**：`GET /user/balance` 取 CNY 钱包；刷新失败保留上次读数并标「已过期 + 最后更新时间」。
+- **余额**：CNY 钱包，一律在 Host 侧读取 —— 有 `DEEPSEEK_API_KEY` 时走 `GET /user/balance`，没有 key 时走 DSH 自己的账户服务拿同一份钱包（`deepseek-account` 登录的 profile 无需 API Key 也能显示余额）。刷新失败保留上次读数并标「已过期 + 最后更新时间」；既没有 key 也没登录账户时显示「未配置」，不伪造数字。
 - **峰谷**：北京时间周一至周五 09:00–12:00、14:00–18:00 为高峰（不含法定节假日）；其余（含周末、法定节假日、调休上班的周末）为空闲，单价 50%。
 - **提醒**：切换前 ≤5 分钟在读数带上显示倒计时；切换瞬间静默提示 3 秒，不弹窗、不打断输入。
 - **配置**：余额刷新间隔（默认 60s，`15–3600`）走 DSH settings；View 布局走本插件设置页。
@@ -33,7 +33,8 @@ Host / Client 强制分离；PricingStrategy、BalanceProvider、PeakPeriodProvi
 ```
 definition/   契约与纯数据：ViewModel、RPC 协议、峰谷算法、价格表、节假日 policy
 provider/     可替换实现：TablePricingStrategy、PolicyPeakPeriodProvider、
-              DeepSeekBalanceProvider、BalanceState、Calibrator、NullAlertSink
+              DeepSeekBalanceProvider、AccountBalanceProvider、FallbackBalanceProvider、
+              BalanceState、Calibrator、NullAlertSink
 consumer/     只依赖 definition：Ledger（token 折叠）、ViewModelBuilder、Hub、ViewConfig
 host/         装配层：ctx 注册（事件/定时器/路由）全部走 ctx.effect
 client/       core.js（Transport、Store、ViewRegistry、React 挂载壳、设置页）
@@ -102,6 +103,7 @@ node scripts/dev.mjs --no-start   # 只 link 不启动
 ## 安全
 
 - API Key **只在 Host** 通过 `ctx.credentials.resolve('DEEPSEEK_API_KEY')` 读取（provider 存储 → 环境变量 → `.env`），只出现在发往 DeepSeek 的 `Authorization` 头里。
+- 账户那条路**完全不碰 token**：`AccountBalanceProvider` 通过 `ctx.get('deepseekAccount')` 向 Host 要钱包金额，拿不到 DSH 凭据库里的平台授权。账户服务不存在时按 `no-credential` 降级，行为与没配 key 完全一致。
 - 返回浏览器的 ViewModel **逐字段构造**，有字段白名单与测试断言；不含 key、URL、上游响应体、Session 对象或事件。
 - 错误码是枚举（`no-credential` / `http-401` / `network` / `bad-payload` …），上游文本被丢弃。
 - View 脚本路由只按清单白名单、只读包内 `src/client/views/`，防路径穿越。
@@ -111,7 +113,7 @@ node scripts/dev.mjs --no-start   # 只 link 不启动
 
 1. **流式 token 只能是估算 + 尾部分片**：DeepSeek 的 usage 在流末尾才给，所以「流式中精确 token」不存在；本插件明确标注估算。
 2. **余额与模型消费不同源**：`/user/balance` 含赠金与 Search/Fetch 扣费；差值校准做了平滑（α=0.3）与夹紧（0.5–2.0），仍可能有残差。
-3. **只有 API Key 一条余额来源**：当前 profile 用 `deepseek-account` 登录且没有 API Key 时，余额显示「未配置」，不伪造数字。接口已为后续 `deepseekAccount` 实现预留。
+3. **两条余额来源的边界**：有 `DEEPSEEK_API_KEY` 时以 `/user/balance` 为准（含赠金与 Search/Fetch 扣费）；没有 key 但用 `deepseek-account` 登录时，改由 DSH 账户服务给出充值钱包 + 赠金钱包的 CNY 合计。两者都拿不到才显示「未配置」。
 4. **DSH Config schema 可降级**：`@deepseek-ai/schemastery` 通过动态 import 获取；取不到时插件照常运行，`apply(ctx, rawConfig)` 自行校验，设置页仍可改 View 配置。
 
 ## 检查与测试
